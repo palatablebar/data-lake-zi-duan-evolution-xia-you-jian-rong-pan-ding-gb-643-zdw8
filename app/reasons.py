@@ -49,6 +49,18 @@ CODES: dict[str, tuple[str, str]] = {
     "VERSION_APPLIED": ("版本已登记", "info"),
     "RUN_REUSED": ("同一输入命中已算批次", "info"),
     "WINDOW_INVERTED": ("生效区间起点不早于终点", "break"),
+    # 列序裁定（按列位置读写的消费方）
+    "POSITION_PROCEED": ("列序未变，可继续按位置读写", "info"),
+    "POSITION_USE_VIEW": ("列序位移，需切到兼容视图", "warn"),
+    "POSITION_HALT": ("旧位置映射未核清，停止放行", "break"),
+    "POSITION_INSERT_SHIFT": ("新列插入导致后续列位置后移", "warn"),
+    "POSITION_REORDERED": ("存量列相对顺序被调整", "warn"),
+    "POSITION_OCCUPANT_SWAP": ("同一位置的字段身份已换人", "break"),
+    "POSITION_OCCUPANT_DROPPED": ("旧位置在新版本没有对应字段", "break"),
+    "POSITION_EVIDENCE_MISSING": ("旧位置映射缺证据，不能放行", "break"),
+    "POSITION_VIEW_SWITCHED": ("已切换到列序兼容视图", "info"),
+    "POSITION_SWITCH_FAILED": ("兼容视图切换失败，已恢复旧版裁定", "break"),
+    "POSITION_SWITCH_ROLLED_BACK": ("已恢复旧版裁定与导出", "info"),
     # 结论
     "COMPATIBLE": ("兼容", "info"),
     "COMPATIBLE_BY_MAPPING": ("加别名后兼容", "warn"),

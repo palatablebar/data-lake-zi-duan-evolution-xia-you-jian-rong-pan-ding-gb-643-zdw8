@@ -50,10 +50,55 @@
   {% endif %}
 </section>
 
+<section class="doc-section">
+  <h2><span class="clause">7</span>列序裁定</h2>
+  {% set position = run.get('position') or {} %}
+  {% if position.get('verdicts') %}
+  <p class="lede">
+    位置证据 <span class="mono">{{ position.evidence_hash }}</span>
+    可继续 <span class="mono">{{ position.summary.proceed }}</span>
+    切视图 <span class="mono">{{ position.summary.use_view }}</span>
+    停止 <span class="mono">{{ position.summary.halt }}</span>
+  </p>
+  <div class="wrap-scroll">
+    <table>
+      <caption>与 /position 页共用同一份位置证据<sup class="fn">3</sup></caption>
+      <thead>
+        <tr><th>消费方</th><th>表</th><th>裁定</th><th>原因</th><th class="num">受影响旧列号</th></tr>
+      </thead>
+      <tbody>
+        {% for item in position.verdicts if item.get('is_position') %}
+        {% for claim in item.get('claims') or [{}] %}
+        <tr>
+          <td class="name">{{ item.consumer }}</td>
+          <td class="name">{{ claim.table or '—' }}</td>
+          <td>
+            {% if claim.verdict == 'HALT' %}<span class="st st-bad">{{ claim.verdict|posverdict }}</span>
+            {% elif claim.verdict == 'USE_VIEW' %}<span class="st st-warn">{{ claim.verdict|posverdict }}</span>
+            {% else %}<span class="st st-ok">{{ claim.verdict|posverdict }}</span>{% endif %}
+          </td>
+          <td class="reason"><span class="code">{{ claim.reason|reason }}</span></td>
+          <td class="num">{{ claim.affected_ordinals|join(', ') or '—' }}</td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="actions">
+    <a class="btn ghost" href="/api/export/position.csv">列序裁定 CSV</a>
+    <a class="btn ghost" href="/position">前往列序裁定页</a>
+  </div>
+  {% else %}
+  <p class="empty">没有按列位置读写的消费方。</p>
+  {% endif %}
+</section>
+
 <aside class="notes">
   <ol class="footnotes">
     <li>条款号与导出的 Markdown 一致。<a class="back" href="#main">↩</a></li>
     <li>账目差额不为 0 说明判定漏项。<a class="back" href="#main">↩</a></li>
+    <li id="fn3">页面、迁移单与 CSV 共用同一 evidence_hash 的位置证据。<a class="back" href="#main">↩</a></li>
   </ol>
 </aside>
 {% endblock %}

@@ -1,8 +1,8 @@
 # 深度登记 fieldmap
 
-- 规模：中型（7 个功能模块，76 个文件，65 条测试）
-- 核心规则：字段身份只认 `field_id`；类型兼容按 Decimal 值域 / 刻度 / 精确整数三件套判定；影响面 = 引用身份解析后的反向闭包
-- 使用者与工作流：湖仓数据管理员拿到上游新版元数据后，判定 60 个下游视图/任务是否还能跑，并出一份带条款号的迁移单
+- 规模：中型（8 个功能模块，84 个文件，95 条测试）
+- 核心规则：字段身份只认 `field_id`；类型兼容按 Decimal 值域 / 刻度 / 精确整数三件套判定；影响面 = 引用身份解析后的反向闭包；列序裁定只认声明列号，旧位置映射未核清一律 HALT
+- 使用者与工作流：湖仓数据管理员拿到上游新版元数据后，判定 60 个下游视图/任务是否还能跑，并出一份带条款号的迁移单；对按列位置读写的任务再出一份列序裁定与兼容视图
 
 ## 功能模块
 
@@ -15,6 +15,7 @@
 | M5 影响面 | 看受影响的下游节点、环、断链、单边登记 | GET /api/impact | `app/modules/m5_impact/handler.py` `app/modules/m5_impact/service.py` `app/modules/m5_impact/closure.py` `app/modules/m5_impact/cycle.py` `app/modules/m5_impact/broken.py` | `tests/test_m5_impact.py` |
 | M6 版本批次 | 跑批次、看历史、验陈旧拒绝与区间重叠 | POST /api/runs | `app/modules/m6_batches/handler.py` `app/modules/m6_batches/service.py` `app/modules/m6_batches/window.py` `app/modules/m6_batches/guard.py` `app/modules/m6_batches/history.py` | `tests/test_m6_batches.py` |
 | M7 迁移单 | 出带条款号的迁移单与三份账目 CSV | GET /api/export/spec.md | `app/modules/m7_migration/handler.py` `app/modules/m7_migration/service.py` `app/modules/m7_migration/spec_md.py` `app/modules/m7_migration/csv_out.py` `app/modules/m7_migration/ledger.py` | `tests/test_m7_migration.py` |
+| M8 列序裁定 | 看逐列号位置证据、三档裁定，切换/回滚兼容视图 | GET /position、POST /api/position/switch | `app/modules/m8_position/handler.py` `app/modules/m8_position/service.py` `app/modules/m8_position/evidence.py` `app/modules/m8_position/verdict.py` `app/modules/m8_position/claims.py` `app/modules/m8_position/compat_view.py` | `tests/test_m8_position.py` |
 
 ## 陷阱登记
 
@@ -30,6 +31,8 @@
 | TRAP-22 | 同一字段被连续改过两次名 | 只认最近一跳，最早的名字解析不到 | 跨版本改名链一路解析到底 | `app/modules/m4_mapping/rename.py` | `tests/test_m4_mapping.py::test_trap22_alias_chain_resolves_multi_hop` |
 | TRAP-25 | 两个版本生效区间重叠 | 取到哪版看运气 | 半开区间比较，重叠直接标记警告 | `app/modules/m6_batches/window.py` | `tests/test_m6_batches.py::test_trap25_overlap_flagged_but_adjacent_clean` |
 | TRAP-26 | 基于旧版本号提交 | 后提交无条件覆盖新结果 | 版本号乐观锁，基线落后即 409 | `app/modules/m6_batches/guard.py` | `tests/test_m6_batches.py::test_trap26_stale_submission_rejected` |
+| TRAP-27 | 上游插一列、挪一列，身份比对仍兼容 | 按列号读写的任务把交易值读进状态、把状态写给交易值 | 单列号重建位置证据，给位置消费方下 PROCEED/USE_VIEW/HALT 三档；证据阻断或列被删一律 HALT | `app/modules/m8_position/evidence.py` `app/modules/m8_position/verdict.py` | `tests/test_m8_position.py::test_three_tier_verdicts` |
+| TRAP-28 | 兼容视图切换中途失败 | 半切换状态：部分任务读新视图、部分读旧表 | 切换前备份旧裁定与导出，失败即回滚并复算导出逐字比对 | `app/modules/m8_position/service.py` | `tests/test_m8_position.py::test_switch_failure_restores_verdicts_and_exports` |
 
 ## 对账规则
 

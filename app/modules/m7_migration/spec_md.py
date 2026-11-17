@@ -46,6 +46,54 @@ def _md_table(header: list[str], rows: list[list[str]]) -> str:
     return "\n".join(lines)
 
 
+def _position_section(run: dict) -> list[str]:
+    """列序裁定：页面与迁移单必须展示同一份位置证据（同一 evidence_hash）。"""
+    from app.modules.m8_position import evidence as evidence_mod
+
+    position = run.get("position") or {}
+    summary = position.get("summary") or {}
+    lines = [
+        "## 7 列序裁定",
+        "",
+        f"- 位置证据指纹：`{position.get('evidence_hash', '—')}`",
+        f"- 位置消费方：{summary.get('position_consumers', 0)} 个，"
+        f"可继续 {summary.get('proceed', 0)}、需切兼容视图 {summary.get('use_view', 0)}、"
+        f"停止放行 {summary.get('halt', 0)}",
+        "",
+        _md_table(
+            ["消费方", "模式", "表", "裁定", "原因码", "受影响旧列号"],
+            [
+                [
+                    item["consumer"],
+                    item.get("mode") or "—",
+                    claim["table"],
+                    evidence_mod.VERDICT_LABEL.get(claim["verdict"], claim["verdict"]),
+                    claim["reason"],
+                    " ".join(str(x) for x in claim.get("affected_ordinals", [])) or "—",
+                ]
+                for item in position.get("verdicts", [])
+                if item.get("is_position")
+                for claim in (item.get("claims") or [{}])
+            ],
+        ),
+        "",
+    ]
+    views = position.get("views") or []
+    if views:
+        lines.append("列序兼容视图：")
+        lines.append("")
+        lines.append("```sql")
+        for view in views:
+            lines.append(view["sql"])
+        lines.append("```")
+        lines.append("")
+    blocked = position.get("blocked_tables") or []
+    if blocked:
+        lines.append(f"阻断表（旧位置映射未核清，禁止放行）：{', '.join(blocked)}")
+        lines.append("")
+    return lines
+
+
 def render(run: dict) -> str:
     ledger = run.get("ledger") or {}
     fields = ledger.get("fields") or {}
@@ -141,6 +189,7 @@ def render(run: dict) -> str:
         "3. 版本切回上一版，生效区间端点保持半开。",
         "",
     ])
+    parts.extend(_position_section(run))
     for index, note in enumerate(FOOTNOTES, start=1):
         parts.append(f"[^{index}]: {note}")
     parts.append("")

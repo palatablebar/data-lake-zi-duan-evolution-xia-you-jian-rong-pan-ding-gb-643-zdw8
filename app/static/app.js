@@ -31,6 +31,22 @@ const ACTIONS = {
     }
     return `比较完成 ${result.change}`;
   },
+
+  async 'pos-switch'(button) {
+    const body = {};
+    if (button.dataset.fail) {
+      body.simulate_fail = true;
+    }
+    const result = await request('/api/position/switch', body);
+    return `已切兼容视图 ${result.switched.length} 个：${result.switched.join(', ')}`;
+  },
+
+  async 'pos-rollback'() {
+    const result = await request('/api/position/rollback', {});
+    return result.exports_match
+      ? `已回滚 ${result.restored_consumers.length} 个，导出逐字复原`
+      : '回滚完成但导出存在差异，请人工核对';
+  },
 };
 
 async function request(url, body) {

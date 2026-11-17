@@ -1,0 +1,92 @@
+{
+  "registered_at": "2026-10-02T03:00:00Z",
+  "consumers": [
+    {
+      "name": "etl.txn_wide_loader",
+      "kind": "task",
+      "sql": "select t.txn_id from fct_txn t",
+      "access": "position",
+      "mode": "both",
+      "position_tables": ["fct_txn"],
+      "upstream": [],
+      "downstream": []
+    },
+    {
+      "name": "etl.txn_amt_reader",
+      "kind": "task",
+      "sql": "select t.txn_id from fct_txn t",
+      "access": "position",
+      "mode": "read",
+      "positions": [{"table": "fct_txn", "ordinals": [3]}],
+      "upstream": [],
+      "downstream": []
+    },
+    {
+      "name": "etl.shop_wide_loader",
+      "kind": "task",
+      "sql": "select s.shop_id from dim_shop s",
+      "access": "position",
+      "mode": "read",
+      "position_tables": ["dim_shop"],
+      "upstream": [],
+      "downstream": []
+    },
+    {
+      "name": "etl.shop_first_two",
+      "kind": "task",
+      "sql": "select s.shop_id from dim_shop s",
+      "access": "position",
+      "mode": "write",
+      "positions": [{"table": "dim_shop", "ordinals": [1, 2]}],
+      "upstream": [],
+      "downstream": []
+    },
+    {
+      "name": "etl.txn_id_reader",
+      "kind": "task",
+      "sql": "select t.txn_id from fct_txn t",
+      "access": "position",
+      "mode": "read",
+      "positions": [{"table": "fct_txn", "ordinals": [1, 2]}],
+      "upstream": [],
+      "downstream": []
+    },
+    {
+      "name": "etl.ghost_table_loader",
+      "kind": "task",
+      "sql": "select g.ghost_id from dim_ghost g",
+      "access": "position",
+      "mode": "both",
+      "positions": [{"table": "dim_ghost", "ordinals": [1]}],
+      "upstream": [],
+      "downstream": []
+    },
+    {
+      "name": "etl.bad_ordinal_reader",
+      "kind": "task",
+      "sql": "select t.txn_id from fct_txn t",
+      "access": "position",
+      "mode": "read",
+      "positions": [{"table": "fct_txn", "ordinals": [9]}],
+      "upstream": [],
+      "downstream": []
+    },
+    {
+      "name": "etl.pay_coupon_reader",
+      "kind": "task",
+      "sql": "select p.pay_id from dim_pay p",
+      "access": "position",
+      "mode": "read",
+      "positions": [{"table": "dim_pay", "ordinals": [2, 3]}],
+      "upstream": [],
+      "downstream": []
+    },
+    {
+      "name": "etl.name_based_reader",
+      "kind": "view",
+      "sql": "select t.txn_id, t.status from fct_txn t",
+      "upstream": [],
+      "downstream": []
+    }
+  ]
+}

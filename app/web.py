@@ -24,6 +24,7 @@ NAV = [
     {"slug": "impact", "href": "/impact", "label": "影响面"},
     {"slug": "batches", "href": "/batches", "label": "版本历史"},
     {"slug": "spec", "href": "/spec", "label": "迁移单"},
+    {"slug": "position", "href": "/position", "label": "列序裁定"},
 ]
 
 
@@ -73,12 +74,26 @@ def _via(value: str | None) -> str:
     return VIA_LABELS.get(value, value)
 
 
+POSITION_VERDICT_LABELS = {
+    "PROCEED": "可继续",
+    "USE_VIEW": "需切兼容视图",
+    "HALT": "停止放行",
+}
+
+
+def _position_verdict(value: str | None) -> str:
+    if not value:
+        return "—"
+    return POSITION_VERDICT_LABELS.get(value, value)
+
+
 templates.env.filters["ts"] = _ts
 templates.env.filters["reason"] = _label
 templates.env.filters["sev"] = _sev
 templates.env.filters["narrow"] = _narrow
 templates.env.filters["day"] = _day
 templates.env.filters["via"] = _via
+templates.env.filters["posverdict"] = _position_verdict
 
 
 def shell_context(active: str) -> dict:

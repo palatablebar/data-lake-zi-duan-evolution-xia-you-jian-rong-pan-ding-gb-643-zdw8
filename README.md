@@ -9,8 +9,9 @@
 - 读者 / 写者两向判定，结论分兼容、需别名、破坏三档。
 - 字段映射与别名 SQL；改名同时换类型的项不生成别名，单独列为冲突。
 - 影响面 = 引用身份解析后的反向闭包，附环、自引用、断链、单边登记。
-- 批次幂等：同一输入命中批次键不再新增行；基线落后的提交返回 409。
-- 迁移单 Markdown + 字段账、引用账、账目、运行清单四份导出。
+- 列序裁定：按声明列号重建位置证据，给按列位置读写的任务下可继续 / 需切兼容视图 / 停止放行三档；旧位置映射未核清一律停止，切换失败自动恢复旧版裁定与导出。
+- 批次幂等：同一输入命中批次键不再新增行（列序裁定按证据指纹幂等）；基线落后的提交返回 409。
+- 迁移单 Markdown + 字段账、引用账、账目、列序账四份导出。
 
 ## 模块
 
@@ -23,6 +24,7 @@
 | M5 影响面 | 闭包、环、断链、单边 | `GET /api/impact`、`/impact` |
 | M6 版本批次 | 跑批次、历史、陈旧拒绝 | `POST /api/runs`、`/batches` |
 | M7 迁移单 | 条款号、账目导出 | `GET /api/export/spec.md`、`/spec` |
+| M8 列序裁定 | 位置证据、三档裁定、视图切换/回滚 | `GET /position`、`POST /api/position/switch` |
 
 ## 核心规则
 
@@ -53,21 +55,22 @@ curl -s localhost:18202/api/health
 4. `/impact` 影响面：受影响节点 4 个、1 个环、1 个自引用、2 处断链、2 处单边。
 5. `/batches` 版本历史：四账并列；「陈旧提交」验证 409。
 6. `/spec` 迁移单：6 条破坏条款，导出 Markdown 与三份 CSV。
+7. `/position` 列序裁定：同一证据指纹驱动页面与迁移单第 7 节；「模拟切换失败」验证自动回滚。
 
 ## 页面
 
-`/`、`/types`、`/mapping`、`/impact`、`/batches`、`/spec`，另有 `/docs` 作为接口说明。
+`/`、`/types`、`/mapping`、`/impact`、`/batches`、`/spec`、`/position`，另有 `/docs` 作为接口说明。
 
 ## 目录
 
 ```text
 app/                入口、配置、原因码、清单、库、渲染
-app/modules/m1..m7/ 每个模块 handler + service + 三个纯规则/读写文件
-app/templates/      base + 6 页
+app/modules/m1..m8/ 每个模块 handler + service + 纯规则/读写文件
+app/templates/      base + 7 页
 app/static/         theme / layout / components + app / table / footnote
 docs/               DEPTH、DATA-DICTIONARY、RUNBOOK
-sample_data/        5 个样例，含一个 GB18030 + CRLF + 标记的脏件
-tests/              conftest、7 个模块测试、e2e、不变量、fixtures
+sample_data/        样例含一个 GB18030 + CRLF + 标记的脏件，以及列序裁定专用的两版结构与登记
+tests/              conftest、8 个模块测试、e2e、不变量、fixtures
 ```
 
 ## 测试

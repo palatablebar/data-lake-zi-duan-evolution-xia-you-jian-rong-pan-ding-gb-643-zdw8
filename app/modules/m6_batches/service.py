@@ -13,6 +13,7 @@ from app.modules.m4_mapping import service as mapping
 from app.modules.m5_impact import service as impact
 from app.modules.m6_batches import guard, history, window as window_mod
 from app.modules.m7_migration import service as migration
+from app.modules.m8_position import service as position_service
 
 
 def _ref_counts(consumers: list[dict]) -> dict:
@@ -101,6 +102,15 @@ def execute(old_file: str = config.DEFAULT_OLD, new_file: str = config.DEFAULT_N
     mapping_table = mapping.build_mapping(old_snapshot["fields"], new_snapshot["fields"], diff)
     impact_payload = impact.build(diff, refs["consumers"], resolution)
     ledger = migration.build_ledger(diff, refs["consumers"], resolution)
+    # 列序裁定与字段身份判定共用同一份两版快照，位置证据随批次落盘
+    position_payload = position_service.build_position({
+        "fields_old": old_snapshot["fields"],
+        "fields_new": new_snapshot["fields"],
+        "quarantine_old": old_snapshot["diagnostics"],
+        "quarantine_new": new_snapshot["diagnostics"],
+        "refs": {"consumers": refs["consumers"]},
+        "run_id": None,
+    })
 
     warnings = guard.overlap_warnings(window, store.list_windows())
     created_at = config.now_utc().isoformat()
@@ -142,6 +152,7 @@ def execute(old_file: str = config.DEFAULT_OLD, new_file: str = config.DEFAULT_N
         "resolution": _json_safe(resolution),
         "impact": impact_payload,
         "ledger": ledger,
+        "position": position_payload,
         "quarantine": ([dict(row, side="old") for row in old_snapshot["diagnostics"]]
                        + [dict(row, side="new") for row in new_snapshot["diagnostics"]]),
         "quarantine_old": old_snapshot["diagnostics"],
@@ -151,6 +162,7 @@ def execute(old_file: str = config.DEFAULT_OLD, new_file: str = config.DEFAULT_N
     }
     run["summary"] = history.summary_of(run)
     store.save_run(run)
+    position_service.sync_verdicts(run)
     return run
 
 

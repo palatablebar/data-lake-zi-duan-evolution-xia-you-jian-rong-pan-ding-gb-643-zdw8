@@ -109,8 +109,8 @@ def test_mapping_conflict_when_two_old_names_hit_one_new_name():
 
 def test_ref_account_is_balanced(run):
     ledger = run["ledger"]
-    assert ledger["refs"]["refs_total"] == 17
-    assert ledger["refs"]["reachable"] == 14
+    assert ledger["refs"]["refs_total"] == 19
+    assert ledger["refs"]["reachable"] == 16
     assert ledger["refs"]["broken"] == 3
     assert ledger["refs"]["aliased"] == 2
     assert ledger["refs"]["balanced"] is True

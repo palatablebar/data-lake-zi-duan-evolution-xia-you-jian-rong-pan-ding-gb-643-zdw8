@@ -94,7 +94,7 @@ def test_ledger_csv_values(run):
     assert rows["new_total"] == "16"
     assert rows["unchanged"] == "4"
     assert rows["conflict"] == "1"
-    assert rows["refs_total"] == "17"
+    assert rows["refs_total"] == "19"
     assert rows["broken"] == "3"
 
 

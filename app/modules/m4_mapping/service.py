@@ -39,6 +39,11 @@ def load_refs(rel_path: str) -> dict:
             "unresolved": parsed["unresolved"],
             "upstream": [str(x) for x in (item.get("upstream") or [])],
             "downstream": [str(x) for x in (item.get("downstream") or [])],
+            # 位置消费方登记：按列号而不是列名读写，交给 M8 列序裁定
+            "access": str(item.get("access") or "name"),
+            "mode": str(item.get("mode") or "both"),
+            "position_tables": [str(x) for x in (item.get("position_tables") or [])],
+            "positions": [dict(x) for x in (item.get("positions") or []) if isinstance(x, dict)],
         })
     if not consumers:
         raise errors.BadInput("下游登记为空", detail={"file": path.name})

@@ -55,6 +55,22 @@ docker compose up -d --build
 | GET | `/api/export/refs.csv` | 引用账 CSV |
 | GET | `/api/export/ledger.csv` | 账目 CSV |
 | GET | `/api/export/manifest.json` | 运行清单 |
+| GET | `/api/position/verdicts` | 位置消费方三档裁定与激活态 |
+| GET | `/api/position/evidence` | 逐列号位置证据与指纹 |
+| GET | `/api/position/views` | 列序兼容视图 SQL |
+| POST | `/api/position/switch` | 切兼容视图（可带 `simulate_fail` 演练失败恢复） |
+| POST | `/api/position/rollback` | 回滚到旧版裁定并校验导出复原 |
+| GET | `/api/position/audit` | 切换/回滚审计 |
+| GET | `/api/export/position.csv` | 列序裁定 CSV |
+
+## 6b 列序裁定
+
+1. 打开 `/position`，先核对位置证据指纹与每张表的逐列号位移，再看消费方裁定。
+2. `PROCEED` 可继续按位置读写；`USE_VIEW` 在页面点「切换兼容视图」，
+   任务改读 `表__pos_compat`；`HALT` 必须人工核清旧位置映射，不允许放行。
+3. 上线前用「模拟切换失败」演练：返回 409 且激活态全部回到「旧版」才算恢复可用。
+4. 切换出问题点「回滚」，返回 `exports_match=true` 才表示 CSV 与迁移单已逐字复原。
+5. 同一结构重跑命中批次键，裁定记录不新增，已切的激活态保留。
 
 ## 6 失败处置
 
@@ -64,6 +80,8 @@ docker compose up -d --build
 | 400 `WINDOW_INVERTED` | 生效区间起点不早于终点 | 检查 `effective_from` / `effective_to` |
 | 400 `BAD_INPUT` | 文件名、参数或 JSON 结构不对 | 看返回的 `detail` |
 | 404 `NOT_FOUND` | 还没跑过批次 | 先在 `/batches` 点「跑一次」 |
+| 409 `POSITION_SWITCH_FAILED` | 兼容视图切换失败 | 已自动回滚旧裁定与导出；看 `/api/position/audit` 定位失败消费方 |
+| 400 `POSITION_HALT` 类 | 对 HALT 消费方切视图，或没有可切换项 | 先核清旧位置映射，HALT 不生成兼容视图 |
 
 ## 7 端口与并发
 

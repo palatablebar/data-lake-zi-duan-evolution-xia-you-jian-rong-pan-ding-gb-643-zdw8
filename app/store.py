@@ -56,7 +56,30 @@ CREATE TABLE IF NOT EXISTS kv (
     k TEXT PRIMARY KEY,
     v TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS position_verdicts (
+    evidence_hash TEXT NOT NULL,
+    consumer      TEXT NOT NULL,
+    run_id        TEXT NOT NULL,
+    verdict       TEXT NOT NULL,
+    reason        TEXT NOT NULL,
+    mode          TEXT,
+    activation    TEXT NOT NULL DEFAULT 'none',
+    detail        TEXT,
+    payload_json  TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (evidence_hash, consumer)
+);
+CREATE TABLE IF NOT EXISTS position_audit (
+    audit_id      TEXT PRIMARY KEY,
+    evidence_hash TEXT NOT NULL,
+    action        TEXT NOT NULL,
+    status        TEXT NOT NULL,
+    consumers     TEXT NOT NULL,
+    detail        TEXT,
+    created_at    TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_quarantine_schema ON quarantine(schema_id);
+CREATE INDEX IF NOT EXISTS idx_position_audit_hash ON position_audit(evidence_hash);
 """
 
 
@@ -83,7 +106,8 @@ def reset() -> None:
     """测试与重建用：清空全部业务表。"""
     with _LOCK, _connect() as conn:
         conn.executescript(SCHEMA)
-        for table in ("snapshots", "runs", "quarantine", "kv"):
+        for table in ("snapshots", "runs", "quarantine", "kv",
+                      "position_verdicts", "position_audit"):
             conn.execute(f"DELETE FROM {table}")
 
 
@@ -272,3 +296,110 @@ def get_kv(key: str, default=None):
     with _LOCK, _connect() as conn:
         row = conn.execute("SELECT v FROM kv WHERE k=?", (key,)).fetchone()
     return _loads(row["v"]) if row else default
+
+
+# ---------- 列序裁定 ----------
+
+def upsert_position_verdict(row: dict) -> None:
+    """按 (证据指纹, 消费方) 幂等写入：同一结构重跑只更新裁定，不新增裁定记录。
+
+    激活态（是否已切兼容视图）由切换/回滚动作单独维护，重跑裁定不得覆盖它。
+    """
+    with _LOCK, _connect() as conn:
+        conn.execute(
+            """INSERT INTO position_verdicts (evidence_hash, consumer, run_id, verdict, reason,
+                   mode, activation, detail, payload_json, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(evidence_hash, consumer) DO UPDATE SET
+                   run_id=excluded.run_id,
+                   verdict=excluded.verdict,
+                   reason=excluded.reason,
+                   mode=excluded.mode,
+                   detail=excluded.detail,
+                   payload_json=json_set(excluded.payload_json, '$.activation',
+                                         position_verdicts.activation),
+                   updated_at=excluded.updated_at""",
+            (
+                row["evidence_hash"], row["consumer"], row["run_id"], row["verdict"],
+                row["reason"], row.get("mode"), row.get("activation", "none"),
+                row.get("detail") or "", _dumps(row), row["updated_at"],
+            ),
+        )
+
+
+def list_position_verdicts(evidence_hash: str) -> list[dict]:
+    with _LOCK, _connect() as conn:
+        rows = conn.execute(
+            """SELECT payload_json FROM position_verdicts
+               WHERE evidence_hash=? ORDER BY consumer""",
+            (evidence_hash,),
+        ).fetchall()
+    return [_loads(row["payload_json"]) for row in rows]
+
+
+def get_position_verdict(evidence_hash: str, consumer: str) -> dict | None:
+    with _LOCK, _connect() as conn:
+        row = conn.execute(
+            "SELECT payload_json FROM position_verdicts WHERE evidence_hash=? AND consumer=?",
+            (evidence_hash, consumer),
+        ).fetchone()
+    return _loads(row["payload_json"]) if row else None
+
+
+def set_position_activation(evidence_hash: str, consumers: list[str], activation: str) -> int:
+    """批量改激活态（none/view），返回更新条数；payload 里的 activation 同步。"""
+    changed = 0
+    with _LOCK, _connect() as conn:
+        for consumer in consumers:
+            row = conn.execute(
+                "SELECT payload_json FROM position_verdicts WHERE evidence_hash=? AND consumer=?",
+                (evidence_hash, consumer),
+            ).fetchone()
+            if row is None:
+                continue
+            payload = _loads(row["payload_json"])
+            payload["activation"] = activation
+            conn.execute(
+                """UPDATE position_verdicts SET activation=?, payload_json=?, updated_at=?
+                   WHERE evidence_hash=? AND consumer=?""",
+                (activation, _dumps(payload), payload["updated_at"],
+                 evidence_hash, consumer),
+            )
+            changed += 1
+    return changed
+
+
+def save_position_audit(row: dict) -> None:
+    with _LOCK, _connect() as conn:
+        conn.execute(
+            """INSERT INTO position_audit (audit_id, evidence_hash, action, status, consumers,
+                   detail, created_at) VALUES (?,?,?,?,?,?,?)""",
+            (
+                row["audit_id"], row["evidence_hash"], row["action"], row["status"],
+                _dumps(row.get("consumers") or []), row.get("detail") or "",
+                row["created_at"],
+            ),
+        )
+
+
+def list_position_audit(evidence_hash: str | None = None, limit: int = 30) -> list[dict]:
+    with _LOCK, _connect() as conn:
+        if evidence_hash:
+            rows = conn.execute(
+                """SELECT audit_id, evidence_hash, action, status, consumers, detail, created_at
+                   FROM position_audit WHERE evidence_hash=?
+                   ORDER BY created_at DESC, audit_id LIMIT ?""",
+                (evidence_hash, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT audit_id, evidence_hash, action, status, consumers, detail, created_at
+                   FROM position_audit ORDER BY created_at DESC, audit_id LIMIT ?""",
+                (limit,),
+            ).fetchall()
+    out = []
+    for row in rows:
+        item = dict(row)
+        item["consumers"] = _loads(item["consumers"])
+        out.append(item)
+    return out

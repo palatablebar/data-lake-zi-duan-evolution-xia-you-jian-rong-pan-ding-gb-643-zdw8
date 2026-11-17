@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}列序裁定 · fieldmap{% endblock %}
+{% block body %}
+<section class="doc-section">
+  <h1>列序裁定</h1>
+  <p class="lede">
+    位置消费方 <span class="mono">{{ summary.position_consumers or 0 }}</span>
+    可继续 <span class="mono">{{ summary.proceed or 0 }}</span>
+    切视图 <span class="mono">{{ summary.use_view or 0 }}</span>
+    停止 <span class="mono">{{ summary.halt or 0 }}</span>
+  </p>
+  <p class="lede">位置证据指纹 <span class="mono">{{ summary.evidence_hash or '—' }}</span><sup class="fn">1</sup></p>
+  <div class="actions">
+    <button type="button" data-action="pos-switch">切换兼容视图</button>
+    <button type="button" class="ghost" data-action="pos-switch" data-fail="1">模拟切换失败</button>
+    <button type="button" class="ghost" data-action="pos-rollback">回滚</button>
+    <a class="btn ghost" href="/api/export/position.csv">列序裁定 CSV</a>
+    <a class="btn ghost" href="/api/position/evidence">位置证据 JSON</a>
+    <span class="flash" data-flash></span>
+  </div>
+
+  {% if empty %}
+  <p class="empty">还没有批次。</p>
+  {% elif verdicts %}
+  <div class="wrap-scroll">
+    <table>
+      <caption>位置消费方裁定<sup class="fn">2</sup></caption>
+      <thead>
+        <tr><th>消费方</th><th>类型</th><th>模式</th><th>表</th><th>裁定</th><th>原因</th><th>受影响旧列号</th><th>激活</th></tr>
+      </thead>
+      <tbody>
+        {% for item in verdicts %}
+        {% for claim in item.get('claims') or [{}] %}
+        <tr>
+          <td class="name">{{ item.consumer }}</td>
+          <td>{{ item.kind or '—' }}</td>
+          <td>{{ item.mode or '—' }}</td>
+          <td class="name">{{ claim.table or '—' }}</td>
+          <td>
+            {% if claim.verdict == 'HALT' %}<span class="st st-bad">{{ claim.verdict|posverdict }}</span>
+            {% elif claim.verdict == 'USE_VIEW' %}<span class="st st-warn">{{ claim.verdict|posverdict }}</span>
+            {% else %}<span class="st st-ok">{{ claim.verdict|posverdict }}</span>{% endif %}
+          </td>
+          <td class="reason"><span class="code">{{ claim.reason|reason }}</span></td>
+          <td class="num">{{ claim.affected_ordinals|join(', ') or '—' }}</td>
+          <td>{% if item.activation == 'view' %}<span class="st st-info">兼容视图</span>{% else %}<span class="st st-none">旧版</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        {% if not item.get('claims') %}
+        <tr>
+          <td class="name">{{ item.consumer }}</td>
+          <td>{{ item.kind or '—' }}</td>
+          <td>{{ item.mode or '—' }}</td>
+          <td class="name">—</td>
+          <td><span class="st st-bad">{{ item.verdict|posverdict }}</span></td>
+          <td class="reason"><span class="code">{{ item.reason|reason }}</span></td>
+          <td class="num">—</td>
+          <td><span class="st st-none">旧版</span></td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">没有按列位置读写的消费方。</p>
+  {% endif %}
+</section>
+
+<section class="doc-section">
+  <h2><span class="clause">2</span>位置证据（逐列号）</h2>
+  {% if entries %}
+  <div class="wrap-scroll">
+    <table>
+      <caption>同一证据同时驱动本页与迁移单<sup class="fn">1</sup></caption>
+      <thead>
+        <tr><th>表</th><th class="num">旧列号</th><th>旧列</th><th class="num">新列号</th><th>新列</th><th>位移</th><th>现占位列</th></tr>
+      </thead>
+      <tbody>
+        {% for row in entries %}
+        <tr>
+          <td class="name">{{ row.table }}</td>
+          <td class="num">{{ row.ordinal or '—' }}</td>
+          <td class="name">{{ row.old_name or '—' }}</td>
+          <td class="num">{{ row.new_ordinal or '—' }}</td>
+          <td class="name">{{ row.new_name or '—' }}</td>
+          <td class="reason"><span class="code">{{ row.reason|reason }}</span></td>
+          <td class="name">{% if row.occupant %}{{ row.occupant.name }}（{{ row.occupant.field_id }}）{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">没有位置证据。</p>
+  {% endif %}
+</section>
+
+<section class="doc-section">
+  <h2><span class="clause">3</span>列序兼容视图</h2>
+  {% if views %}
+  {% for view in views %}
+  <pre>{{ view.sql }}</pre>
+  {% endfor %}
+  {% else %}
+  <p class="empty">没有需要兼容视图的表（HALT 项不生成视图）。</p>
+  {% endif %}
+</section>
+
+<section class="doc-section">
+  <h2><span class="clause">4</span>切换审计</h2>
+  {% if audit %}
+  <table>
+    <thead><tr><th>时间</th><th>动作</th><th>状态</th><th>消费方</th><th>明细</th></tr></thead>
+    <tbody>
+      {% for item in audit %}
+      <tr>
+        <td class="name">{{ item.created_at|day }}</td>
+        <td>{{ item.action }}</td>
+        <td>{% if item.status == 'applied' %}<span class="st st-ok">{{ item.status }}</span>{% else %}<span class="st st-bad">{{ item.status }}</span>{% endif %}</td>
+        <td class="name">{{ item.consumers|join(', ') or '—' }}</td>
+        <td class="reason">{{ item.detail or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">还没有切换记录。</p>
+  {% endif %}
+</section>
+
+<aside class="notes">
+  <ol class="footnotes">
+    <li>页面与迁移单共用同一 evidence_hash 的位置证据，数字不一致即判定漏项。<a class="back" href="#main">↩</a></li>
+    <li>旧位置映射未核清（证据阻断、列被删、表消失、登记不合法）一律 HALT，不放行。<a class="back" href="#main">↩</a></li>
+  </ol>
+</aside>
+{% endblock %}

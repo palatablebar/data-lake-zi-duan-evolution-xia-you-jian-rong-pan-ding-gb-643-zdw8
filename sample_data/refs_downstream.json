@@ -49,6 +49,26 @@
       "sql": "select o.order_id from dim_order o",
       "upstream": ["dw.task_self"],
       "downstream": ["dw.task_self"]
+    },
+    {
+      "name": "dw.task_order_posload",
+      "kind": "task",
+      "sql": "select o.order_id from dim_order o",
+      "access": "position",
+      "mode": "both",
+      "position_tables": ["dim_order"],
+      "upstream": [],
+      "downstream": []
+    },
+    {
+      "name": "dw.task_order_stat_pos",
+      "kind": "task",
+      "sql": "select o.order_id from dim_order o",
+      "access": "position",
+      "mode": "read",
+      "positions": [{"table": "dim_order", "ordinals": [4, 5]}],
+      "upstream": [],
+      "downstream": []
     }
   ]
 }
